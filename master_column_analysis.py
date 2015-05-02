@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     # Set dark current and thresholds
     first_image = metadata['path'][0]
-    treshhold_dict = get_thresh(first_image)
+    threshold_dict = get_thresh(first_image)
 
     # Initialize results array that will hold classes
     results_array = np.zeros((data.shape[0], 1))
