@@ -31,6 +31,8 @@ if __name__ == '__main__':
     print('\tReading in metadata')
     metadata_file = '/Users/bourque/Desktop/data_mining/Project/metadata.dat'
     metadata = ascii.read(metadata_file, guess=False, delimiter=',')
+    dates = metadata['EXPSTART']
+    print(dates)
 
     # Subset the data for testing purposes
     data = data[0:2069,3000:3500]
@@ -57,8 +59,10 @@ if __name__ == '__main__':
         for row in xrange(len(column)):
             pixel = column[row]
 
-            # If pixel is above 3 sigma, flag as hot
+            # Classify pixel
+            # 1 = hot, 2 = cold, 3 = warm, 4 =
             if pixel > median + (3 * stdev):
                 results_array[row,:] = 1
+            elif pixel < median - (3 * stdev):
+                results_array[row,:] = 2
 
-    print(results_array)
