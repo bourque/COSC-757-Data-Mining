@@ -11,6 +11,11 @@ Outputs:
 
 """
 
+from __future__ import print_function
+import os
+from astropy.io import fits
+
+
 if __name__ == '__main__':
 
     # Open master column image and read in data
@@ -20,7 +25,7 @@ if __name__ == '__main__':
         data = hdulist[0].data
 
     # Subset the data
-    data = data[0:2069,3000:3500]
+    data = data[0:2069,3000:]
 
     # Save the test data to new image for visualization purposes
     print('\tWriting out test image')
