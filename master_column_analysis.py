@@ -83,7 +83,7 @@ def classify_pixel(pixel, row_num, dark_current, stdev, warm_pixel_threshold, ho
     consecutive_threshold = 10
 
     # Make histogram of pixel for visual purposes
-    make_histogram(pixel, row_num, low_threshold, high_threshold, warm_pixel_threshold, hot_pixel_threshold)
+    #make_histogram(pixel, row_num, low_threshold, high_threshold, warm_pixel_threshold, hot_pixel_threshold)
 
     # Initialize variables
     starting_point = 0
@@ -177,13 +177,55 @@ def make_histogram(pixel, row_num, low_threshold, high_threshold, warm_pixel_thr
     plt.close()
 
 # -----------------------------------------------------------------------------
+
+def preprocess_data(data):
+    """Convert the data from DN to e-/s and remove postflash level"""
+
+    # Convert data from DN to e-/s
+    print('\tConverting units from DN to e-/s')
+    data = (data * 1.5) / 900.0
+
+    # Remove postflash
+    print('\tRemoving postflash')
+    for col in xrange(data.shape[1]):
+        flashlvl = metadata['FLASHLVL'][col]
+        if flashlvl > 0:
+            data[:,col] = data[:,col] - (flashlvl / 900.0)
+
+    return data
+
+# -----------------------------------------------------------------------------
+
+def print_summary(results_dict):
+    """Print the results to the screen"""
+
+    classes = [item[0] for item in results_dict.values()]
+    print('\nResults:\n')
+    print('\tGood: {}'.format(len([item for item in classes if item == 0])))
+    print('\tWarm & Stable: {}'.format(len([item for item in classes if item == 1])))
+    print('\tHot & Stable: {}'.format(len([item for item in classes if item == 2])))
+    print('\tUnstable: {}'.format(len([item for item in classes if item == 3])))
+
+# -----------------------------------------------------------------------------
+
+def write_results(results_dict):
+    """Write results out to a text file."""
+
+    results_file = '/Users/bourque/Desktop/data_mining/Project/results.dat'
+    with open(results_file, 'w') as results:
+        results.write('# row class class_date\n')
+        for item in results_dict.iteritems():
+            results.write('{} {} {}\n'.format(item[0], item[1][0], item[1][1]))
+    print('\nResults written to {}'.format(results_file))
+
+# -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 if __name__ == '__main__':
 
     # Open master column image and read in data
     print('\tReading in master column image')
-    master_column_image = '/Users/bourque/Desktop/data_mining/Project/master_column_500.fits'
+    master_column_image = '/Users/bourque/Desktop/data_mining/Project/master_column_test.fits'
     with fits.open(master_column_image) as hdulist:
         data = hdulist[0].data
 
@@ -196,16 +238,8 @@ if __name__ == '__main__':
     first_image = metadata['path'][0]
     threshold_dict = get_thresh(first_image)
 
-    # Convert data from DN to e-/s
-    print('\tConverting units from DN to e-/s')
-    data = (data * 1.5) / 900.0
-
-    # Remove postflash
-    print('\tRemoving postflash')
-    for col in xrange(data.shape[1]):
-        flashlvl = metadata['FLASHLVL'][col]
-        if flashlvl > 0:
-            data[:,col] = data[:,col] - (flashlvl / 900.0)
+    # Convert data to e-/s and remove postflash
+    data = preprocess_data(data)
 
     # Initialize dict to hold results
     results_dict = {}
@@ -223,8 +257,8 @@ if __name__ == '__main__':
         # Define thresholds
         thresh_sig = 0.1
         thresh_var = 0.5
-        warm_pixel_threshold = 4.3
-        hot_pixel_threshold = 4.4
+        warm_pixel_threshold = 4.2
+        hot_pixel_threshold = 4.3
 
         # Classify the row/pixel
         pixel_class, class_date = classify_pixel(
@@ -241,17 +275,7 @@ if __name__ == '__main__':
         results_dict[row_num+1] = [pixel_class, class_date]
 
     # Print summary of results
-    classes = [item[0] for item in results_dict.values()]
-    print('\nResults:\n')
-    print('\tGood: {}'.format(len([item for item in classes if item == 0])))
-    print('\tWarm & Stable: {}'.format(len([item for item in classes if item == 1])))
-    print('\tHot & Stable: {}'.format(len([item for item in classes if item == 2])))
-    print('\tUnstable: {}'.format(len([item for item in classes if item == 3])))
+    print_summary(results_dict)
 
     # Write results to text file
-    results_file = '/Users/bourque/Desktop/data_mining/Project/results.dat'
-    with open(results_file, 'w') as results:
-        results.write('# row class class_date\n')
-        for item in results_dict.iteritems():
-            results.write('{} {} {}\n'.format(item[0], item[1][0], item[1][1]))
-    print('\nResults written to {}'.format(results_file))
+    write_results(results_dict)
