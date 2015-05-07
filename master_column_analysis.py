@@ -177,6 +177,16 @@ if __name__ == '__main__':
     first_image = metadata['path'][0]
     threshold_dict = get_thresh(first_image)
 
+    # Convert data from DN to e-/s
+    print('\tConverting units from DN to e-/s')
+    data = (data * 1.5) / 900.0
+
+    # Remove postflash
+    for col in xrange(data.shape[1]):
+        flashlvl = metadata['FLASHLVL'][col]
+        if flashlvl > 0:
+            data[:,col] = data[:,col] - (flashlvl / 900.0)
+
     # Initialize dict to hold results
     results_dict = {}
 
@@ -191,10 +201,10 @@ if __name__ == '__main__':
         stdev = threshold_dict['stdev'][amp]
 
         # Define thresholds
-        thresh_sig = 0.2
-        thresh_var = 1.0
-        warm_pixel_threshold = 2510
-        hot_pixel_threshold = 2520
+        thresh_sig = 0.1
+        thresh_var = 0.5
+        warm_pixel_threshold = 4.3
+        hot_pixel_threshold = 4.4
 
         # Classify the row/pixel
         pixel_class, class_date = classify_pixel(
@@ -207,9 +217,20 @@ if __name__ == '__main__':
 
         # Store results in results_dict
         class_date = metadata['EXPSTART'][class_date]
-        results_dict[row_num] = [pixel_class, class_date]
+        results_dict[row_num+1] = [pixel_class, class_date]
+
+    # Print summary of results
+    classes = [item[0] for item in results_dict.values()]
+    print('\nResults:\n')
+    print('\tGood: {}'.format(len([item for item in classes if item == 0])))
+    print('\tWarm & Stable: {}'.format(len([item for item in classes if item == 1])))
+    print('\tHot & Stable: {}'.format(len([item for item in classes if item == 2])))
+    print('\tUnstable: {}'.format(len([item for item in classes if item == 3])))
 
     # Write results to text file
-    #with open('/Users/bourque/Desktop/data_mining/Project/results.dat') as results_file:
-    for item in results_dict.iteritems():
-        print(item)
+    results_file = '/Users/bourque/Desktop/data_mining/Project/results.dat'
+    with open(results_file, 'w') as results:
+        results.write('# row class class_date\n')
+        for item in results_dict.iteritems():
+            results.write('{} {} {}\n'.format(item[0], item[1][0], item[1][1]))
+    print('\nResults written to {}'.format(results_file))

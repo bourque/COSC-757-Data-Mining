@@ -10,8 +10,8 @@ def get_thresh(filename):
     Get the initial thresholds for marking images
     '''
 
-    chip2 = fits.getdata(filename, 1)
-    chip1 = fits.getdata(filename, 4)
+    chip2 = fits.getdata(filename, 1) * 1.5 / 900.0
+    chip1 = fits.getdata(filename, 4) * 1.5 / 900.0
 
     a = chip1[19:2070, 25:2072]
     b = chip1[19:2070, 2130:4178]
