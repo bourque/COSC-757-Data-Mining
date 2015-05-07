@@ -27,7 +27,7 @@ from threshold_vals import get_thresh
 
 # -----------------------------------------------------------------------------
 
-def classify_pixel(pixel, dark_current, stdev, warm_pixel_threshold, hot_pixel_threshold, thresh_sig=3, thresh_var=0.5):
+def classify_pixel(pixel, row_num, dark_current, stdev, warm_pixel_threshold, hot_pixel_threshold, thresh_sig=3, thresh_var=0.5):
     """
     Perform the algorithm to classify the given pixel.  There are 4
     classes of pixels:
@@ -81,6 +81,9 @@ def classify_pixel(pixel, dark_current, stdev, warm_pixel_threshold, hot_pixel_t
     high_threshold = dark_current + (stdev * thresh_sig)
     low_threshold = dark_current - (stdev * thresh_sig)
     consecutive_threshold = 10
+
+    # Make histogram of pixel for visual purposes
+    make_histogram(pixel, row_num, low_threshold, high_threshold, warm_pixel_threshold, hot_pixel_threshold)
 
     # Initialize variables
     starting_point = 0
@@ -158,6 +161,22 @@ def get_amp(row, col):
         return 3
 
 # -----------------------------------------------------------------------------
+
+def make_histogram(pixel, row_num, low_threshold, high_threshold, warm_pixel_threshold, hot_pixel_threshold):
+    """Create a histogram of the pixel for visual purposes"""
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.axvspan(xmin=low_threshold, xmax=high_threshold, facecolor='0.5', alpha=0.3)
+    ax.axvspan(xmin=warm_pixel_threshold, xmax=9999, facecolor='DarkOrange', alpha=0.3)
+    ax.axvspan(xmin=hot_pixel_threshold, xmax=9999, facecolor='red', alpha=0.3)
+    ax.hist(pixel, bins=100, range=(4.0,4.5), histtype='stepfilled', color='green', edgecolor='none')
+    ax.set_xlim((4.0,4.5))
+    ax.set_title('Row {}'.format(row_num))
+    plt.savefig('/Users/bourque/Desktop/data_mining/Project/histograms/{}.png'.format(row_num))
+    plt.close()
+
+# -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 if __name__ == '__main__':
@@ -182,6 +201,7 @@ if __name__ == '__main__':
     data = (data * 1.5) / 900.0
 
     # Remove postflash
+    print('\tRemoving postflash')
     for col in xrange(data.shape[1]):
         flashlvl = metadata['FLASHLVL'][col]
         if flashlvl > 0:
@@ -209,6 +229,7 @@ if __name__ == '__main__':
         # Classify the row/pixel
         pixel_class, class_date = classify_pixel(
             row_data,
+            row_num+1,
             dark_current, stdev,
             warm_pixel_threshold,
             hot_pixel_threshold,
