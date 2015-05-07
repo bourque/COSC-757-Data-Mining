@@ -27,7 +27,7 @@ from threshold_vals import get_thresh
 
 # -----------------------------------------------------------------------------
 
-def classify_pixel(pixel, row_num, dark_current, stdev, warm_pixel_threshold, hot_pixel_threshold, thresh_sig=3, thresh_var=0.5):
+def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
     """
     Perform the algorithm to classify the given pixel.  There are 4
     classes of pixels:
@@ -54,16 +54,16 @@ def classify_pixel(pixel, row_num, dark_current, stdev, warm_pixel_threshold, ho
         stdev : float
             The standard deviation of the background associated with
             the master column image.
-        warm_pixel_threshold : float
+        warm_thresh : float
             The threshold the defines a warm pixel (i.e. if a pixel's
             value exceeds this, it is deemed as "warm")
-        hot_pixel_threshold : float
+        hot_thresh : float
             The threshold the defines a hot pixel (i.e. if a pixel's
             value exceeds this, it is deemed as "hot")
-        thresh_sig : float
+        sig : float
             The number of standard deviations beyond which a pixel
             shall be deemed an outlier
-        thresh_var : float
+        var : float
             The number of standard deviations beyond which a pixel
             shall be deemed unstable.
 
@@ -78,12 +78,13 @@ def classify_pixel(pixel, row_num, dark_current, stdev, warm_pixel_threshold, ho
     """
 
     # Define thresholds
-    high_threshold = dark_current + (stdev * thresh_sig)
-    low_threshold = dark_current - (stdev * thresh_sig)
+    high_threshold = dark_current + (stdev * sig)
+    low_threshold = dark_current - (stdev * sig)
+    warm_thresh = high_threshold
     consecutive_threshold = 10
 
     # Make histogram of pixel for visual purposes
-    #make_histogram(pixel, row_num, low_threshold, high_threshold, warm_pixel_threshold, hot_pixel_threshold)
+    #make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh)
 
     # Initialize variables
     starting_point = 0
@@ -112,7 +113,7 @@ def classify_pixel(pixel, row_num, dark_current, stdev, warm_pixel_threshold, ho
                 assert varience != 0, 'Varience is 0'
 
                 # If varience exceeds varience threshold, it is unstable
-                if varience > thresh_var * stdev:
+                if varience > var * stdev:
                     pixel_class = 3
 
                 break
@@ -120,17 +121,17 @@ def classify_pixel(pixel, row_num, dark_current, stdev, warm_pixel_threshold, ho
         # If pixel is not varying, determine if hot or warm
         median = np.median(pixel[starting_point:-1])
         if varience == 0:
-            if median < warm_pixel_threshold:
+            if median < warm_thresh:
                 assert starting_point == 0, 'Starting point for good pixel is not 0'
                 pixel_class = 0
-            elif median >= warm_pixel_threshold and median < hot_pixel_threshold:
+            elif median >= warm_thresh and median < hot_thresh:
                 pixel_class = 1
             else:
                 pixel_class = 2
         elif pixel_class != 3:
-            if median >= warm_pixel_threshold and median < hot_pixel_threshold:
+            if median >= warm_thresh and median < hot_thresh:
                 pixel_class = 1
-            elif median >= hot_pixel_threshold:
+            elif median >= hot_thresh:
                 pixel_class = 2
             else:
                 print("Noooooooo")
@@ -162,14 +163,14 @@ def get_amp(row, col):
 
 # -----------------------------------------------------------------------------
 
-def make_histogram(pixel, row_num, low_threshold, high_threshold, warm_pixel_threshold, hot_pixel_threshold):
+def make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh):
     """Create a histogram of the pixel for visual purposes"""
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.axvspan(xmin=low_threshold, xmax=high_threshold, facecolor='0.5', alpha=0.3)
-    ax.axvspan(xmin=warm_pixel_threshold, xmax=9999, facecolor='DarkOrange', alpha=0.3)
-    ax.axvspan(xmin=hot_pixel_threshold, xmax=9999, facecolor='red', alpha=0.3)
+    ax.axvspan(xmin=warm_thresh, xmax=9999, facecolor='DarkOrange', alpha=0.3)
+    ax.axvspan(xmin=hot_thresh, xmax=9999, facecolor='red', alpha=0.3)
     ax.hist(pixel, bins=100, range=(4.0,4.5), histtype='stepfilled', color='green', edgecolor='none')
     ax.set_xlim((4.0,4.5))
     ax.set_title('Row {}'.format(row_num))
@@ -255,20 +256,12 @@ if __name__ == '__main__':
         stdev = threshold_dict['stdev'][amp]
 
         # Define thresholds
-        thresh_sig = 0.1
-        thresh_var = 0.5
-        warm_pixel_threshold = 4.2
-        hot_pixel_threshold = 4.3
+        hot_thresh = 4.3
+        sig = 0.1
+        var = 0.5
 
         # Classify the row/pixel
-        pixel_class, class_date = classify_pixel(
-            row_data,
-            row_num+1,
-            dark_current, stdev,
-            warm_pixel_threshold,
-            hot_pixel_threshold,
-            thresh_sig,
-            thresh_var)
+        pixel_class, class_date = classify_pixel(row_data, row_num+1, dark_current, stdev, hot_thresh, sig, var)
 
         # Store results in results_dict
         class_date = metadata['EXPSTART'][class_date]
