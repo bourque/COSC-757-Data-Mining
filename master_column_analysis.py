@@ -179,6 +179,26 @@ def make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, h
 
 # -----------------------------------------------------------------------------
 
+def make_scatter(pixel, row_num, savename=''):
+    '''
+    Create a scatter plot to visualize what is happening to a single pixel
+    over time
+    '''
+    # to conform to matt's previous saving naming scheme
+    if savename == '':
+        savename = '/Users/bourque/Desktop/data_mining/Project/histograms/scatter_{}.png'.format(row_num)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.scatter(np.arange(0,len(pixel)),pixel, marker='.', c='b')
+    ax.set_title(str(row_num))
+    ax.set_ylabel('Charge in Pixel')
+    ax.set_xlabel('Time')
+    plt.savefig(savename)
+    plt.close()
+
+# -----------------------------------------------------------------------------
+
 def preprocess_data(data):
     """Convert the data from DN to e-/s and remove postflash level"""
 
