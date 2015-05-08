@@ -134,7 +134,7 @@ def get_data(hdulist, column, detector):
     if detector == 'uvis':
         ext1_data = hdulist[1].data[:, column:column + 1]
         ext4_data = hdulist[4].data[:, column:column + 1]
-        data = np.concatenate((ext1_data, ext4_data), axis=0)
+        data = np.concatenate((ext4_data, ext1_data), axis=0)
     elif detector == 'ir':
         data = hdulist[1].data[:, column:column + 1]
 
