@@ -25,7 +25,7 @@ if __name__ == '__main__':
         data = hdulist[0].data
 
     # Subset the data
-    data = data[0:2069,3000:]
+    data = data[0:2069,:]
 
     # Save the test data to new image for visualization purposes
     print('\tWriting out test image')

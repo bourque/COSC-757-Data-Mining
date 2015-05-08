@@ -22,13 +22,13 @@ def get_thresh(filename):
             returns the median of dark current and its standard deviation.
     '''
 
-    chip2 = fits.getdata(filename, 1)
-    chip1 = fits.getdata(filename, 4)
+    chip2 = fits.getdata(filename, 1) * 1.5 / 900.0
+    chip1 = fits.getdata(filename, 4) * 1.5 / 900.0
 
     a = chip1[19:2070, 25:2072]
     b = chip1[19:2070, 2130:4178]
-    c = chip2[19:2070, 25:2072]
-    d = chip1[19:2070, 2130:4178]
+    c = chip2[0:2051, 25:2072]
+    d = chip1[0:2070, 2130:4178]
 
     meda = np.median(a)
     astdev = np.std(a)

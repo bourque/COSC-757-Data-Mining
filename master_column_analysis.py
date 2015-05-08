@@ -27,7 +27,7 @@ from threshold_vals import get_thresh
 
 # -----------------------------------------------------------------------------
 
-def classify_pixel(pixel, dark_current, stdev, warm_pixel_threshold, hot_pixel_threshold, thresh_sig=3, thresh_var=0.5):
+def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
     """
     Perform the algorithm to classify the given pixel.  There are 4
     classes of pixels:
@@ -54,16 +54,16 @@ def classify_pixel(pixel, dark_current, stdev, warm_pixel_threshold, hot_pixel_t
         stdev : float
             The standard deviation of the background associated with
             the master column image.
-        warm_pixel_threshold : float
+        warm_thresh : float
             The threshold the defines a warm pixel (i.e. if a pixel's
             value exceeds this, it is deemed as "warm")
-        hot_pixel_threshold : float
+        hot_thresh : float
             The threshold the defines a hot pixel (i.e. if a pixel's
             value exceeds this, it is deemed as "hot")
-        thresh_sig : float
+        sig : float
             The number of standard deviations beyond which a pixel
             shall be deemed an outlier
-        thresh_var : float
+        var : float
             The number of standard deviations beyond which a pixel
             shall be deemed unstable.
 
@@ -78,9 +78,14 @@ def classify_pixel(pixel, dark_current, stdev, warm_pixel_threshold, hot_pixel_t
     """
 
     # Define thresholds
-    high_threshold = dark_current + (stdev * thresh_sig)
-    low_threshold = dark_current - (stdev * thresh_sig)
+    high_threshold = dark_current + (stdev * sig)
+    low_threshold = dark_current - (stdev * sig)
+    warm_thresh = high_threshold
     consecutive_threshold = 10
+    consecutive_flag = False
+
+    # Make histogram of pixel for visual purposes
+    make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh)
 
     # Initialize variables
     starting_point = 0
@@ -103,34 +108,33 @@ def classify_pixel(pixel, dark_current, stdev, warm_pixel_threshold, hot_pixel_t
             # for stability
             if len(consecutive_list) >= consecutive_threshold:
 
-                # Calculate varience based on first bad pixel to the end
+                # Indicate that there was a consecutive outlier and determine when it happened
+                consecutive_flag = True
                 starting_point = consecutive_list[0]
+
+                # Calculate varience based on first bad pixel to the end
                 varience = np.var(pixel[starting_point:-1])
-                assert varience != 0, 'Varience is 0'
 
                 # If varience exceeds varience threshold, it is unstable
-                if varience > thresh_var * stdev:
+                if varience > var * stdev:
                     pixel_class = 3
 
                 break
 
-        # If pixel is not varying, determine if hot or warm
-        median = np.median(pixel[starting_point:-1])
-        if varience == 0:
-            if median < warm_pixel_threshold:
-                assert starting_point == 0, 'Starting point for good pixel is not 0'
-                pixel_class = 0
-            elif median >= warm_pixel_threshold and median < hot_pixel_threshold:
-                pixel_class = 1
-            else:
-                pixel_class = 2
-        elif pixel_class != 3:
-            if median >= warm_pixel_threshold and median < hot_pixel_threshold:
-                pixel_class = 1
-            elif median >= hot_pixel_threshold:
+        # If there were not enough consecutive outliers, then the pixel is good
+        if consecutive_flag == False:
+            pixel_class = 0
+
+        # If the pixel class is still 0, but has consecutive outliers, then it must be an outlier that is stable
+        # Thus, determine if it is warm or hot by comparing its 'beyond outlier' median to the thresholds
+        if pixel_class == 0 and consecutive_flag == True:
+            median = np.median(pixel[starting_point:-1])
+
+
+            if median > warm_thresh:
                 pixel_class = 2
             else:
-                print("Noooooooo")
+                pixel_class = 1
 
     return pixel_class, starting_point
 
@@ -158,13 +162,71 @@ def get_amp(row, col):
         return 3
 
 # -----------------------------------------------------------------------------
+
+def make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh):
+    """Create a histogram of the pixel for visual purposes"""
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.axvspan(xmin=low_threshold, xmax=high_threshold, facecolor='0.5', alpha=0.3)
+    ax.axvspan(xmin=warm_thresh, xmax=9999, facecolor='DarkOrange', alpha=0.3)
+    ax.axvspan(xmin=hot_thresh, xmax=9999, facecolor='red', alpha=0.3)
+    ax.hist(pixel, bins=100, range=(4.0,4.5), histtype='stepfilled', color='green', edgecolor='none')
+    ax.set_xlim((4.0,4.5))
+    ax.set_title('Row {}'.format(row_num))
+    plt.savefig('/Users/bourque/Desktop/data_mining/Project/histograms/{}.png'.format(row_num))
+    plt.close()
+
+# -----------------------------------------------------------------------------
+
+def preprocess_data(data):
+    """Convert the data from DN to e-/s and remove postflash level"""
+
+    # Convert data from DN to e-/s
+    print('\tConverting units from DN to e-/s')
+    data = (data * 1.5) / 900.0
+
+    # Remove postflash
+    print('\tRemoving postflash')
+    for col in xrange(data.shape[1]):
+        flashlvl = metadata['FLASHLVL'][col]
+        if flashlvl > 0:
+            data[:,col] = data[:,col] - (flashlvl / 900.0)
+
+    return data
+
+# -----------------------------------------------------------------------------
+
+def print_summary(results_dict):
+    """Print the results to the screen"""
+
+    classes = [item[0] for item in results_dict.values()]
+    print('\nResults:\n')
+    print('\tGood: {}'.format(len([item for item in classes if item == 0])))
+    print('\tWarm & Stable: {}'.format(len([item for item in classes if item == 1])))
+    print('\tHot & Stable: {}'.format(len([item for item in classes if item == 2])))
+    print('\tUnstable: {}'.format(len([item for item in classes if item == 3])))
+
+# -----------------------------------------------------------------------------
+
+def write_results(results_dict):
+    """Write results out to a text file."""
+
+    results_file = '/Users/bourque/Desktop/data_mining/Project/results.dat'
+    with open(results_file, 'w') as results:
+        results.write('# row class class_date\n')
+        for item in results_dict.iteritems():
+            results.write('{} {} {} {}\n'.format(item[0], item[1][0], item[1][1], item[1][2]))
+    print('\nResults written to {}'.format(results_file))
+
+# -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 if __name__ == '__main__':
 
     # Open master column image and read in data
     print('\tReading in master column image')
-    master_column_image = '/Users/bourque/Desktop/data_mining/Project/master_column_500.fits'
+    master_column_image = '/Users/bourque/Desktop/data_mining/Project/master_column_test.fits'
     with fits.open(master_column_image) as hdulist:
         data = hdulist[0].data
 
@@ -176,6 +238,9 @@ if __name__ == '__main__':
     # Get dark current and stdev of first image to be used as baseline background
     first_image = metadata['path'][0]
     threshold_dict = get_thresh(first_image)
+
+    # Convert data to e-/s and remove postflash
+    data = preprocess_data(data)
 
     # Initialize dict to hold results
     results_dict = {}
@@ -191,25 +256,19 @@ if __name__ == '__main__':
         stdev = threshold_dict['stdev'][amp]
 
         # Define thresholds
-        thresh_sig = 0.2
-        thresh_var = 1.0
-        warm_pixel_threshold = 2510
-        hot_pixel_threshold = 2520
+        hot_thresh = 4.3
+        sig = 0.1
+        var = 0.5
 
         # Classify the row/pixel
-        pixel_class, class_date = classify_pixel(
-            row_data,
-            dark_current, stdev,
-            warm_pixel_threshold,
-            hot_pixel_threshold,
-            thresh_sig,
-            thresh_var)
+        pixel_class, class_date = classify_pixel(row_data, row_num+1, dark_current, stdev, hot_thresh, sig, var)
 
         # Store results in results_dict
-        class_date = metadata['EXPSTART'][class_date]
-        results_dict[row_num] = [pixel_class, class_date]
+        class_expstart = metadata['EXPSTART'][class_date]
+        results_dict[row_num+1] = [pixel_class, class_expstart, class_date]
+
+    # Print summary of results
+    print_summary(results_dict)
 
     # Write results to text file
-    #with open('/Users/bourque/Desktop/data_mining/Project/results.dat') as results_file:
-    for item in results_dict.iteritems():
-        print(item)
+    write_results(results_dict)
