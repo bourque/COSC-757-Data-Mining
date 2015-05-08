@@ -5,9 +5,21 @@ import math
 import numpy as np
 
 
+__author__ = 'Dave Borncamp'
+__version__ = '0.1'
+
+
 def get_thresh(filename):
     '''
     Get the initial thresholds for marking images
+
+    Input:
+        filename = The name (and path) of the fits file to get the values from
+
+    Returns:
+        Thredholddict - dictionary with 2 keys, dark_current and stdev. These
+            have a list which contain the values for amilifiers a,b,c,d. This
+            returns the median of dark current and its standard deviation.
     '''
 
     chip2 = fits.getdata(filename, 1)
