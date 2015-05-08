@@ -15,8 +15,8 @@ def get_thresh(filename):
 
     a = chip1[19:2070, 25:2072]
     b = chip1[19:2070, 2130:4178]
-    c = chip2[19:2070, 25:2072]
-    d = chip1[19:2070, 2130:4178]
+    c = chip2[0:2051, 25:2072]
+    d = chip1[0:2070, 2130:4178]
 
     meda = np.median(a)
     astdev = np.std(a)
