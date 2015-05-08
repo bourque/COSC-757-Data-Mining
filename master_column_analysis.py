@@ -82,9 +82,10 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
     low_threshold = dark_current - (stdev * sig)
     warm_thresh = high_threshold
     consecutive_threshold = 10
+    consecutive_flag = False
 
     # Make histogram of pixel for visual purposes
-    #make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh)
+    make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh)
 
     # Initialize variables
     starting_point = 0
@@ -107,10 +108,12 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
             # for stability
             if len(consecutive_list) >= consecutive_threshold:
 
-                # Calculate varience based on first bad pixel to the end
+                # Indicate that there was a consecutive outlier and determine when it happened
+                consecutive_flag = True
                 starting_point = consecutive_list[0]
+
+                # Calculate varience based on first bad pixel to the end
                 varience = np.var(pixel[starting_point:-1])
-                assert varience != 0, 'Varience is 0'
 
                 # If varience exceeds varience threshold, it is unstable
                 if varience > var * stdev:
@@ -118,23 +121,20 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
 
                 break
 
-        # If pixel is not varying, determine if hot or warm
-        median = np.median(pixel[starting_point:-1])
-        if varience == 0:
-            if median < warm_thresh:
-                assert starting_point == 0, 'Starting point for good pixel is not 0'
-                pixel_class = 0
-            elif median >= warm_thresh and median < hot_thresh:
-                pixel_class = 1
-            else:
-                pixel_class = 2
-        elif pixel_class != 3:
-            if median >= warm_thresh and median < hot_thresh:
-                pixel_class = 1
-            elif median >= hot_thresh:
+        # If there were not enough consecutive outliers, then the pixel is good
+        if consecutive_flag == False:
+            pixel_class = 0
+
+        # If the pixel class is still 0, but has consecutive outliers, then it must be an outlier that is stable
+        # Thus, determine if it is warm or hot by comparing its 'beyond outlier' median to the thresholds
+        if pixel_class == 0 and consecutive_flag == True:
+            median = np.median(pixel[starting_point:-1])
+
+
+            if median > warm_thresh:
                 pixel_class = 2
             else:
-                print("Noooooooo")
+                pixel_class = 1
 
     return pixel_class, starting_point
 
@@ -216,7 +216,7 @@ def write_results(results_dict):
     with open(results_file, 'w') as results:
         results.write('# row class class_date\n')
         for item in results_dict.iteritems():
-            results.write('{} {} {}\n'.format(item[0], item[1][0], item[1][1]))
+            results.write('{} {} {} {}\n'.format(item[0], item[1][0], item[1][1], item[1][2]))
     print('\nResults written to {}'.format(results_file))
 
 # -----------------------------------------------------------------------------
@@ -264,8 +264,8 @@ if __name__ == '__main__':
         pixel_class, class_date = classify_pixel(row_data, row_num+1, dark_current, stdev, hot_thresh, sig, var)
 
         # Store results in results_dict
-        class_date = metadata['EXPSTART'][class_date]
-        results_dict[row_num+1] = [pixel_class, class_date]
+        class_expstart = metadata['EXPSTART'][class_date]
+        results_dict[row_num+1] = [pixel_class, class_expstart, class_date]
 
     # Print summary of results
     print_summary(results_dict)
