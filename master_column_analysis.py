@@ -87,6 +87,9 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
     # Make histogram of pixel for visual purposes
     make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh)
 
+    # Make scatter plot of the pixel
+    make_scatter(pixel, row_num, warm_thresh, hot_thresh)
+
     # Initialize variables
     starting_point = 0
     varience = 0
@@ -187,7 +190,7 @@ def make_scatter(pixel, row_num, warm_thresh, hot_thresh, savename=''):
     # to conform to matt's previous saving naming scheme
     if savename == '':
         savename = '/Users/bourque/Desktop/data_mining/Project/histograms/scatter_{}.png'.format(row_num)
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.scatter(np.arange(0,len(pixel)),pixel, marker='.', c='b')
@@ -197,6 +200,7 @@ def make_scatter(pixel, row_num, warm_thresh, hot_thresh, savename=''):
     ax.axhline(warm_thresh, color='orange')
     ax.axhline(hot_thresh, color='r')
     ax.set_xlim((0,len(pixel)))
+    ax.set_ylim((4,5))
     plt.savefig(savename)
     plt.close()
 
