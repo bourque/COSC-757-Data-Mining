@@ -135,7 +135,6 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
 
                 # Calculate variance based on first bad pixel to the end
                 variance = np.std(pixel[starting_point:-1])
-                print(variance, var, var*stdev)
 
                 # If variance exceeds variance threshold, it is unstable
                 if variance > var * stdev:
@@ -270,7 +269,7 @@ def make_scatter(pixel, row_num, high_threshold, hot_thresh, pixel_class, savena
     ax.set_title('Row {}: Pixel Class = {}'.format(row_num, pixel_class))
     ax.set_ylabel('Pixel value (e-/s)')
     ax.set_xlabel('Time')
-    ax.axhline(warm_thresh, color='orange', linewidth=2)
+    ax.axhline(high_threshold, color='orange', linewidth=2)
     ax.axhline(hot_thresh, color='r', linewidth=2)
     ax.set_xlim((0,len(pixel)))
     ax.set_ylim((4.1,4.7))
