@@ -5,24 +5,44 @@
 Authors:
     Matthew Bourque, May 2015
     David Borncamp, May 2015
+    Arielle Leone, May 2015
+    James Miller, May 2015
 
 Use:
+    This program is intended to be executed via the command line as
+    such:
+        >>> python master_column_analysis.py
 
 Outputs:
-
+    (1) results.dat - A text file containing the classification
+        results.  The file contains four columns: (1) The row/pixel
+        number, (2) the pixel class, (3) The classificaiton date (in
+        MJD) and (4) The index of the classification date.
+    (2) histogram_<row_num>.png - A histogram showing the distribution
+        of pixel values for the given row/pixel and where the values
+        fall within the outlier/warm/hot regimes.
+    (3) scatter_<row_num>.png - A scatter plot showing the pixel values
+        over time for the given row/pixel and where the values fall
+        within the warm/hot regimes.
+    (4) An output to the STDOUT showing the number of pixel for each
+        pixel class.
 """
 
+# Python 3 imports
 from __future__ import print_function
 
+# Built in imports
 from itertools import groupby
 from operator import itemgetter
 import os
 
+# Third party imports
 from astropy.io import fits
 from astropy.io import ascii
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Local imports
 from threshold_vals import get_thresh
 
 # -----------------------------------------------------------------------------
@@ -37,26 +57,30 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
     2 = Hot & Stable
     3 = Unstable
 
-    Good pixels are defined as pixels whose values remain below the
-    warm and hot pixel thresholds throughout their lifetime.  Warm
-    pixels are defined as those that have values that fall above the
-    warm pixel threshold and fall below the hot pixel threshold.  Hot
-    pixels are defined as those that have values that exceed the hot
-    pixel threshold limit.
+    Good pixels are defined as pixels whose values remain stable and
+    are not deemed a consistent outlier throughout their lifetimes.
+    Warm pixels are those whose values are outliers but remain below
+    the hot pixel threshold throughout their lifetimes.  Hot pixels are
+    those whose values consistently exceed the hot pixel threshold
+    throughout their lifetimes.  Stable pixels are those whose values
+    remain relatively constant throughout their lifetimes, regardless
+    if they fall within the "good", "warm", or "hot" regime.  Unstable
+    pixels are those whose values vary beyond the variance threshold
+    for a significant portion of their lifetimes.
 
     Parameters:
         pixel : numpy array
             A 1D array corresponding to a row in the master column
             image.
+        row_num : int
+            The row number in the column image associatied with the
+            given pixel.
         dark_current : float
             The background dark current associated with the master
             column image.
         stdev : float
             The standard deviation of the background associated with
             the master column image.
-        warm_thresh : float
-            The threshold the defines a warm pixel (i.e. if a pixel's
-            value exceeds this, it is deemed as "warm")
         hot_thresh : float
             The threshold the defines a hot pixel (i.e. if a pixel's
             value exceeds this, it is deemed as "hot")
@@ -84,15 +108,9 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
     consecutive_threshold = 10
     consecutive_flag = False
 
-    # Make histogram of pixel for visual purposes
-    make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh)
-
-    # Make scatter plot of the pixel
-    make_scatter(pixel, row_num, warm_thresh, hot_thresh)
-
     # Initialize variables
     starting_point = 0
-    varience = 0
+    variance = 0
     pixel_class = 0
 
     # Find indices of pixels that are outliers
@@ -115,11 +133,12 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
                 consecutive_flag = True
                 starting_point = consecutive_list[0]
 
-                # Calculate varience based on first bad pixel to the end
-                varience = np.var(pixel[starting_point:-1])
+                # Calculate variance based on first bad pixel to the end
+                variance = np.std(pixel[starting_point:-1])
+                print(variance, var, var*stdev)
 
-                # If varience exceeds varience threshold, it is unstable
-                if varience > var * stdev:
+                # If variance exceeds variance threshold, it is unstable
+                if variance > var * stdev:
                     pixel_class = 3
 
                 break
@@ -132,12 +151,14 @@ def classify_pixel(pixel, row_num, dark_current, stdev, hot_thresh, sig, var):
         # Thus, determine if it is warm or hot by comparing its 'beyond outlier' median to the thresholds
         if pixel_class == 0 and consecutive_flag == True:
             median = np.median(pixel[starting_point:-1])
-
-
-            if median > warm_thresh:
+            if median > hot_thresh:
                 pixel_class = 2
             else:
                 pixel_class = 1
+
+    # Make plots pixel for visual purposes
+    make_histogram(pixel, row_num, low_threshold, high_threshold, hot_thresh, pixel_class)
+    make_scatter(pixel, row_num, high_threshold, hot_thresh, pixel_class)
 
     return pixel_class, starting_point
 
@@ -153,6 +174,11 @@ def get_amp(row, col):
             The row number.
         col : int
             The column number.
+
+    Returns:
+        0, 1, 2, or 3
+            The index of the threshold_dict that is associated with the
+            amp.
     """
 
     if row >= 2070 and col <= 2103:
@@ -166,48 +192,121 @@ def get_amp(row, col):
 
 # -----------------------------------------------------------------------------
 
-def make_histogram(pixel, row_num, low_threshold, high_threshold, warm_thresh, hot_thresh):
-    """Create a histogram of the pixel for visual purposes"""
+def make_histogram(pixel, row_num, low_threshold, high_threshold, hot_thresh, pixel_class):
+    """
+    Create a histogram of the pixel for visual purposes.
+
+    Parameters:
+        pixel : numpy array
+            A 1D array corresponding to a row in the master column
+            image.
+        row_num : int
+            The row number in the column image associatied with the
+            given pixel.
+        low_threshold : float
+            The value below which data points are considered outliers.
+        high_threshold : float
+            The value above which data points are considered outliers.
+        hot_thresh : float
+            The threshold the defines a hot pixel (i.e. if a pixel's
+            value exceeds this, it is deemed as "hot")
+        pixel_class : int
+            The class of the pixel.
+
+    Outputs:
+        scatter_<row_num>.png - A scatter plot showing the pixel values
+            over time for the given row/pixel and where the values fall
+            within the warm/hot regimes.
+    """
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.axvspan(xmin=low_threshold, xmax=high_threshold, facecolor='0.5', alpha=0.3)
-    ax.axvspan(xmin=warm_thresh, xmax=9999, facecolor='DarkOrange', alpha=0.3)
+    ax.axvspan(xmin=high_threshold, xmax=9999, facecolor='DarkOrange', alpha=0.3)
     ax.axvspan(xmin=hot_thresh, xmax=9999, facecolor='red', alpha=0.3)
     ax.hist(pixel, bins=100, range=(4.0,4.5), histtype='stepfilled', color='green', edgecolor='none')
     ax.set_xlim((4.0,4.5))
-    ax.set_title('Row {}'.format(row_num))
-    plt.savefig('/Users/bourque/Desktop/data_mining/Project/histograms/{}.png'.format(row_num))
+    ax.set_xlabel('Pixel Value (e-/s)')
+    ax.set_title('Row {}: Pixel Class = {}'.format(row_num, pixel_class))
+    plt.savefig('/Users/bourque/Desktop/data_mining/Project/plots/histogram_{}.png'.format(row_num))
     plt.close()
 
 # -----------------------------------------------------------------------------
 
-def make_scatter(pixel, row_num, warm_thresh, hot_thresh, savename=''):
-    '''
-        Create a scatter plot to visualize what is happening to a single pixel
-        over time
-        '''
+def make_scatter(pixel, row_num, high_threshold, hot_thresh, pixel_class, savename=''):
+    """
+    Create a scatter plot of the pixel for visual purposes.
+
+    Parameters:
+        pixel : numpy array
+            A 1D array corresponding to a row in the master column
+            image.
+        row_num : int
+            The row number in the column image associatied with the
+            given pixel.
+        high_threshold : float
+            The value above which data points are considered outliers.
+        hot_thresh : float
+            The threshold the defines a hot pixel (i.e. if a pixel's
+            value exceeds this, it is deemed as "hot")
+        pixel_class : int
+            The class of the pixel.
+        savename : string
+            The path to which to save the plot.
+
+    Outputs:
+        histogram_<row_num>.png - A histogram showing the distribution
+            of pixel values for the given row/pixel and where the
+            values fall within the outlier/warm/hot regimes.
+    """
+
     # to conform to matt's previous saving naming scheme
     if savename == '':
-        savename = '/Users/bourque/Desktop/data_mining/Project/histograms/scatter_{}.png'.format(row_num)
+        savename = '/Users/bourque/Desktop/data_mining/Project/plots/scatter_{}.png'.format(row_num)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.scatter(np.arange(0,len(pixel)),pixel, marker='.', c='b')
-    ax.set_title(str(row_num))
-    ax.set_ylabel('Charge in Pixel')
+    ax.scatter(np.arange(0,len(pixel)),pixel, marker='+', c='k', s=1.0)
+    ax.set_title('Row {}: Pixel Class = {}'.format(row_num, pixel_class))
+    ax.set_ylabel('Pixel value (e-/s)')
     ax.set_xlabel('Time')
-    ax.axhline(warm_thresh, color='orange')
-    ax.axhline(hot_thresh, color='r')
+    ax.axhline(warm_thresh, color='orange', linewidth=2)
+    ax.axhline(hot_thresh, color='r', linewidth=2)
     ax.set_xlim((0,len(pixel)))
-    ax.set_ylim((4,5))
+    ax.set_ylim((4.1,4.7))
     plt.savefig(savename)
     plt.close()
 
 # -----------------------------------------------------------------------------
 
 def preprocess_data(data):
-    """Convert the data from DN to e-/s and remove postflash level"""
+    """
+    Convert the data from DN to e-/s and remove postflash level.
+
+    The data in its raw form is in units of DN (data number) which is
+    essentially a measure of the number of counts the pixel received
+    during the observation.  However, it is easier to consider the
+    pixels in units of electrons per second.
+
+    Some observations are taken with "postflash", which is an
+    additional uniform background signal (of usually 12 e-) that is
+    introduced to the pixels at the time of observation.  In order to
+    compare pixel values across postflash and non-postflash
+    observations, the postflash signal is removed from those columns
+    that correspond to observations that have postflash.  The existance
+    of postflash is indicated by the FLASHLVL metadata keyword, which
+    stores the number of e- introduced by the postflash.  If the
+    FLASHLVL is 0, then no postflash occured.
+
+    Parameters:
+        data : numpy array
+            The data column to process.
+
+    Returns:
+        data : numpy array
+            The input array, only with its units converted to e-/s
+            and postflash signal removed (if necessary)
+    """
 
     # Convert data from DN to e-/s
     print('\tConverting units from DN to e-/s')
@@ -225,7 +324,19 @@ def preprocess_data(data):
 # -----------------------------------------------------------------------------
 
 def print_summary(results_dict):
-    """Print the results to the screen"""
+    """
+    Print the results to the screen
+
+    Parameters:
+        results_dict : dict
+            A dictionary whose keys are the row numbers and whose
+            values are lists containing the pixel class, classification
+            date, and classification date index.
+
+    Outputs:
+        Prints the number of pixels that fall under each class to the
+        STDOUT.
+    """
 
     classes = [item[0] for item in results_dict.values()]
     print('\nResults:\n')
@@ -237,7 +348,21 @@ def print_summary(results_dict):
 # -----------------------------------------------------------------------------
 
 def write_results(results_dict):
-    """Write results out to a text file."""
+    """
+    Write results out to a text file.
+
+    Parameters:
+        results_dict : dict
+            A dictionary whose keys are the row numbers and whose
+            values are lists containing the pixel class, classification
+            date, and classification date index.
+
+    Outputs:
+        results.dat - A text file containing the classification
+            results.  The file contains four columns: (1) The row/pixel
+            number, (2) the pixel class, (3) The classificaiton date
+            (in MJD) and (4) The index of the classification date.
+    """
 
     results_file = '/Users/bourque/Desktop/data_mining/Project/results.dat'
     with open(results_file, 'w') as results:
@@ -247,6 +372,7 @@ def write_results(results_dict):
     print('\nResults written to {}'.format(results_file))
 
 # -----------------------------------------------------------------------------
+# For command line execution
 # -----------------------------------------------------------------------------
 
 if __name__ == '__main__':
@@ -283,9 +409,9 @@ if __name__ == '__main__':
         stdev = threshold_dict['stdev'][amp]
 
         # Define thresholds
-        hot_thresh = 4.3
-        sig = 0.1
-        var = 0.5
+        hot_thresh = dark_current + 0.1 * stdev
+        sig = 0.05
+        var = 1.0
 
         # Classify the row/pixel
         pixel_class, class_date = classify_pixel(row_data, row_num+1, dark_current, stdev, hot_thresh, sig, var)
