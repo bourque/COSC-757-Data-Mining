@@ -11,7 +11,7 @@ provide a Quicklook database query to specify the dataset they wish to create
 a master column image for (see Use).
 
 Authors:
-    Matthew Bourque, Janurary 2015
+    Matthew Bourque, February 2015
 
 Use:
     The user must provide four command line arguements with the option

@@ -3,18 +3,28 @@
 """Create test image that is a subset of a master_column image.
 
 Authors:
-    Matthew Bourque, April, 2015
+    Matthew Bourque, May 2015
+    David Borncamp, May 2015
+    Arielle Leone, May 2015
+    James Miller, May 2015
 
 Use:
+    This program is intended to be executed via the command line as
+    such:
+        >>> python master_column_analysis.py
 
 Outputs:
-
+    master_column_test.fits - The master column image to test the
+    classification algorithm with.
 """
 
 from __future__ import print_function
 import os
 from astropy.io import fits
 
+# -----------------------------------------------------------------------------
+# For command line execution
+# -----------------------------------------------------------------------------
 
 if __name__ == '__main__':
 
